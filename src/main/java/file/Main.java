@@ -3,37 +3,47 @@ package file;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 3) {
-            throw new IllegalArgumentException("Probably some arguments are missing: filename, pattern, file type");
+        if (args.length != 4) {
+            throw new IllegalArgumentException("Probably some arguments are missing: program mode, filename, pattern, file type message");
         }
 
-        String filename = args[0];
-        String pattern = args[1];
-        String fileType = args[2];
+        String mode = args[0];
+        String filename = args[1];
+        String pattern = args[2];
+        String fileType = args[3];
 
+        PatternSearchEngine searchEngine = new PatternSearchEngine();
         byte[] patternBytes = pattern.getBytes();
-        byte[] bytes = Files.readAllBytes(Paths.get(filename));
+        byte[] fileBytes = Files.readAllBytes(Paths.get(filename));
 
-        if (findPattern(bytes, patternBytes)) {
+        long startTime = System.nanoTime();
+        boolean searchResult;
+        switch (mode) {
+            case "--naive":
+                searchResult = searchEngine.naiveSearch(fileBytes, patternBytes);
+                break;
+            case "--KMP":
+                searchResult = searchEngine.kmpSearch(fileBytes, patternBytes);
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported program mode");
+        }
+
+        long elapsedTime = System.nanoTime() - startTime;
+        if (searchResult) {
             System.out.println(fileType);
         } else {
             System.out.println("Unknown file type");
         }
+        System.out.println(formatTime(elapsedTime));
     }
 
-    private static boolean findPattern(byte[] bytes, byte[] pattern) {
-        for (int i = 0; i < bytes.length - pattern.length + 1; i++) {
-            if (bytes[i] == pattern[0]) {
-                if (Arrays.equals(bytes, i, i + pattern.length, pattern, 0, pattern.length)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    private static String formatTime(long nanos) {
+        float milliseconds = (float) nanos / 1_000_000;
+        return String.format("It took %.3f milliseconds", milliseconds);
     }
 }
