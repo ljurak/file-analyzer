@@ -1,45 +1,62 @@
 package file;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 4) {
-            throw new IllegalArgumentException("Probably some arguments are missing: program mode, filename, pattern, file type message");
+        if (args.length != 3) {
+            throw new IllegalArgumentException("Probably some arguments are missing: directory, pattern, file type message");
         }
 
-        String mode = args[0];
-        String filename = args[1];
-        String pattern = args[2];
-        String fileType = args[3];
+        File directory = new File(args[0]);
+        String pattern = args[1];
+        String fileType = args[2];
 
-        PatternSearchEngine searchEngine = new PatternSearchEngine();
-        byte[] patternBytes = pattern.getBytes();
-        byte[] fileBytes = Files.readAllBytes(Paths.get(filename));
+        if (!(directory.exists() && directory.isDirectory())) {
+            throw new IllegalArgumentException(args[0] + " does not exist or is not a directory");
+        }
 
         long startTime = System.nanoTime();
-        boolean searchResult;
-        switch (mode) {
-            case "--naive":
-                searchResult = searchEngine.naiveSearch(fileBytes, patternBytes);
-                break;
-            case "--KMP":
-                searchResult = searchEngine.kmpSearch(fileBytes, patternBytes);
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported program mode");
+        List<File> files = new ArrayList<>();
+        Files.walk(directory.toPath()).forEach(path -> {
+            if (Files.isRegularFile(path)) {
+                files.add(path.toFile());
+            }
+        });
+
+        byte[] patternBytes = pattern.getBytes();
+        PatternSearchEngine searchEngine = new PatternSearchEngine();
+        ExecutorService pool = Executors.newFixedThreadPool(4);
+
+        List<Future<String>> results = new ArrayList<>();
+        for (File file : files) {
+            CheckFileTask task = new CheckFileTask(file, searchEngine, patternBytes, fileType);
+            Future<String> result = pool.submit(task);
+            results.add(result);
+        }
+
+        for (Future<String> result : results) {
+            try {
+                System.out.println(result.get());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
         }
 
         long elapsedTime = System.nanoTime() - startTime;
-        if (searchResult) {
-            System.out.println(fileType);
-        } else {
-            System.out.println("Unknown file type");
-        }
         System.out.println(formatTime(elapsedTime));
+        pool.shutdown();
     }
 
     private static String formatTime(long nanos) {
