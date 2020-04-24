@@ -1,6 +1,8 @@
 package file;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -13,16 +15,23 @@ import java.util.concurrent.Future;
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 3) {
-            throw new IllegalArgumentException("Probably some arguments are missing: directory, pattern, file type message");
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Probably some arguments are missing: pattern file or files directory");
         }
 
-        File directory = new File(args[0]);
-        String pattern = args[1];
-        String fileType = args[2];
+        String patternFile = args[0];
+        File directory = new File(args[1]);
+
+        List<Pattern> patterns = null;
+        try {
+            patterns = readPatterns(patternFile);
+        } catch (IOException e) {
+            System.out.println("There was a problem reading pattern file.");
+            System.exit(1);
+        }
 
         if (!(directory.exists() && directory.isDirectory())) {
-            throw new IllegalArgumentException(args[0] + " does not exist or is not a directory");
+            throw new IllegalArgumentException(args[1] + " does not exist or is not a directory");
         }
 
         long startTime = System.nanoTime();
@@ -33,13 +42,12 @@ public class Main {
             }
         });
 
-        byte[] patternBytes = pattern.getBytes();
-        PatternSearchEngine searchEngine = new PatternSearchEngine();
+        PatternSearchEngine searchEngine = new PatternSearchEngine(patterns);
         ExecutorService pool = Executors.newFixedThreadPool(4);
 
         List<Future<String>> results = new ArrayList<>();
         for (File file : files) {
-            CheckFileTask task = new CheckFileTask(file, searchEngine, patternBytes, fileType);
+            CheckFileTask task = new CheckFileTask(file, searchEngine);
             Future<String> result = pool.submit(task);
             results.add(result);
         }
@@ -47,9 +55,7 @@ public class Main {
         for (Future<String> result : results) {
             try {
                 System.out.println(result.get());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         }
@@ -57,6 +63,25 @@ public class Main {
         long elapsedTime = System.nanoTime() - startTime;
         System.out.println(formatTime(elapsedTime));
         pool.shutdown();
+    }
+
+    private static List<Pattern> readPatterns(String filename) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            List<Pattern> patterns = new ArrayList<>();
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(";");
+                Pattern pattern = new Pattern(
+                        Integer.parseInt(parts[0]),
+                        parts[1].replace("\"", ""),
+                        parts[2].replace("\"", "")
+                );
+                patterns.add(pattern);
+            }
+
+            return patterns;
+        }
     }
 
     private static String formatTime(long nanos) {
