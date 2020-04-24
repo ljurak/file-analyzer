@@ -1,8 +1,26 @@
 package file;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class PatternSearchEngine {
+
+    private final List<Pattern> patterns;
+
+    public PatternSearchEngine(List<Pattern> patterns) {
+        this.patterns = patterns;
+    }
+
+    public List<Pattern> searchPatterns(byte[] bytes) {
+        List<Pattern> foundPatterns = new ArrayList<>();
+        for (Pattern pattern : patterns) {
+            if (kmpSearch(bytes, pattern.getPattern().getBytes())) {
+                foundPatterns.add(pattern);
+            }
+        }
+        return foundPatterns;
+    }
 
     public boolean kmpSearch(byte[] bytes, byte[] pattern) {
         int[] prefix = prefixFunction(pattern);
@@ -86,7 +104,7 @@ public class PatternSearchEngine {
         return prefix;
     }
 
-    public boolean naiveSearch(byte[] bytes, byte[] pattern) {
+    private boolean naiveSearch(byte[] bytes, byte[] pattern) {
         if (bytes.length < pattern.length) {
             return false;
         }
