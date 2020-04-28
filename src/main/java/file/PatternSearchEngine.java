@@ -118,4 +118,111 @@ public class PatternSearchEngine {
         }
         return false;
     }
+
+    public static boolean rabinKarpSearch(byte[] bytes, byte[] pattern) {
+        int t = bytes.length;
+        int p = pattern.length;
+
+        int a = 53;
+        long m = 1_000_000_000 + 9;
+
+        long patternHash = 0;
+        long currentHash = 0;
+        long pow = 1;
+
+        for (int i = 0; i < p; i++) {
+            patternHash += pattern[i] * pow;
+            patternHash %= m;
+
+            currentHash += bytes[i] * pow;
+            currentHash %= m;
+
+            if (i != p - 1) {
+                pow = pow * a % m;
+            }
+        }
+
+        for (int i = 0; i <= t - p; i++) {
+            if (patternHash == currentHash) {
+                boolean patternIsFound = true;
+                for (int j = 0; j < p; j++) {
+                    if (bytes[i + j] != pattern[j]) {
+                        patternIsFound = false;
+                        break;
+                    }
+                }
+
+                if (patternIsFound) {
+                    return true;
+                }
+            }
+
+            if (i < t - p) {
+                currentHash = (currentHash - bytes[i] + m) % m / a;
+                currentHash = (currentHash + bytes[i + p] * pow) % m;
+            }
+        }
+
+        return false;
+    }
+
+    public static boolean rabinKarpSearch(String text, String pattern) {
+        int t = text.length();
+        int p = pattern.length();
+
+        int patternHash = polynomialHash(pattern, 0, p);
+        int currentHash = polynomialHash(text, t - p, t);
+
+        for (int i = t - p; i >= 0; i--) {
+            if (currentHash == patternHash) {
+                boolean foundPattern = true;
+                for (int j = 0; j < pattern.length(); j++) {
+                    if (text.charAt(i + j) != pattern.charAt(j)) {
+                        foundPattern = false;
+                        break;
+                    }
+                }
+
+                if (foundPattern) {
+                    return true;
+                }
+            }
+
+            if (i > 0) {
+                currentHash = rollingHash(text, i - 1, i - 1 + p, currentHash);
+            }
+        }
+
+        return false;
+    }
+
+    private static int polynomialHash(String s, int from, int to) { // from inclusive, to exclusive
+        if (from >= to) {
+            throw new IllegalArgumentException("To must be greater than from");
+        }
+
+        int a = 53;
+        int m = 1_000_000_000 + 9;
+
+        int power = 1;
+        int hash = s.charAt(from);
+
+        for (int i = from; i < to; i++) {
+            hash += s.charAt(i) * power;
+            hash %= m;
+            power = power * a % m;
+        }
+
+        return hash;
+    }
+
+    private static int rollingHash(String s, int from, int to, int previousHash) { // from inclusive to exclusive
+        int a = 53;
+        int m = 1_000_000_000 + 9;
+
+        int hash = previousHash - s.charAt(to) * (int) Math.pow(a, to - from - 1) % m + m;
+        hash = hash * a % m;
+        hash = (hash + s.charAt(from)) % m;
+        return hash;
+    }
 }
